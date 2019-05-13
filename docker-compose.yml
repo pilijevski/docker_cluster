@@ -1,0 +1,87 @@
+version: '3'
+
+services:
+  client:
+    image: application
+    container_name: client-app
+    build: ./application
+    volumes:
+      - ./shared_folder:/usr/src/shared_folder
+      - ./application:/usr/src/app
+    environment:
+      - WAIT_HOSTS=rabbitmq:5672,postgres:5432
+      - WAIT_HOSTS_TIMEOUT=60
+      - WAIT_BEFORE_HOSTS=5
+      - WAIT_SLEEP_INTERVAL=5
+    networks:
+      - docker-network
+
+  worker:
+    image: worker
+    hostname: worker
+    container_name: worker
+    build: ./worker
+    volumes:
+      - ./shared_folder:/usr/src/shared_folder
+      - ./worker:/usr/src/app
+    environment:
+      - WAIT_HOSTS=rabbitmq:5672,postgres:5432
+      - WAIT_HOSTS_TIMEOUT=60
+      - WAIT_BEFORE_HOSTS=5
+      - WAIT_SLEEP_INTERVAL=5
+    networks:
+     - docker-network
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    hostname: rabbitmq
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+    ports:
+        - 15672:15672
+        - 5672:5672
+        - 15674:15674
+    networks:
+      - docker-network
+
+  postgres:
+    image: postgres:10        # using postgres version==10 for compatibility with pgadmin
+    hostname: postgres
+    restart: always
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=postgres_db
+    user: postgres
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./database/init-user-db.sh:/docker-entrypoint-initdb.d/init-user-db.sh
+    ports:
+      - 5432:5432
+    networks:
+      - docker-network
+
+  pgadmin:
+    image: dpage/pgadmin4
+    hostname: pgadmin
+    volumes:
+      - pgadmin:/var/lib/pgadmin         # pgadmin volume for storing session and config data
+    environment:
+      - "PGADMIN_DEFAULT_EMAIL=user"  # Default email for login
+      - "PGADMIN_DEFAULT_PASSWORD=password"   # Default password for login
+    networks:
+    - docker-network
+    ports:
+      - 1599:80
+
+networks:
+  docker-network:             # Create a network which will be shared across containers
+    external: false
+
+volumes:
+  pgdata:                  #  this docker-compose file
+    driver: local          # pgdata volume used for storing the database
+  pgadmin:                 # pgadmin volume used for storing sessions in pgadmin container
+    driver: local
